@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ITEX 2.0</title>
+  <meta name="description" content="ITEX 2.0 – Interactive 3D school map by ECC ICT Society. Navigate Eheliyagoda National College.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #06090f;
+      --surface: #0c111a;
+      --panel:   #111827;
+      --cyan:    #00d4ff;
+      --cyan2:   rgba(0,212,255,0.12);
+      --glow:    0 0 18px rgba(0,212,255,0.4);
+      --txt:     #d1d9e6;
+      --muted:   #5a6a7e;
+      --border:  rgba(0,212,255,0.14);
+      --ease:    0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
+
+    /* ── LOADER ── */
+    #loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;transition:opacity .8s ease,visibility .8s ease}
+    #loader.out{opacity:0;visibility:hidden;pointer-events:none}
+    .ld-logo{width:180px;filter:drop-shadow(0 0 24px rgba(0,212,255,.65));animation:float 2.5s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+    .ld-school{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;color:var(--cyan);text-transform:uppercase;text-align:center;opacity:.7}
+    .ld-bar{width:240px;height:2px;background:rgba(0,212,255,.1);border-radius:99px;overflow:hidden}
+    .ld-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),#1a7aff);border-radius:99px;animation:fill 2.3s ease forwards}
+    @keyframes fill{0%{width:0%}55%{width:65%}88%{width:90%}100%{width:100%}}
+    .ld-label{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:4px;color:var(--cyan);text-transform:uppercase;animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+    .ld-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);margin:0 3px;animation:dot 1.2s ease-in-out infinite}
+    .ld-dots span:nth-child(2){animation-delay:.18s}
+    .ld-dots span:nth-child(3){animation-delay:.36s}
+    @keyframes dot{0%,80%,100%{transform:scale(.5);opacity:.25}40%{transform:scale(1.15);opacity:1}}
+
+    /* ── APP ── */
+    #app{width:100vw;height:100vh;display:flex;flex-direction:column;opacity:0;transition:opacity .8s ease .1s}
+    #app.on{opacity:1}
+
+    /* ── HEADER ── */
+    header{position:relative;z-index:30;background:rgba(6,9,15,.96);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:7px 14px;flex-shrink:0;backdrop-filter:blur(14px)}
+    .hd-brand{display:flex;align-items:center;gap:10px}
+    .hd-logo{height:34px;filter:drop-shadow(0 0 9px rgba(0,212,255,.5));animation:float 3.2s ease-in-out infinite}
+    .hd-txt h1{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.8px;color:var(--cyan);text-transform:uppercase;white-space:nowrap}
+    .hd-txt p{font-size:9px;color:var(--muted);letter-spacing:.8px;margin-top:2px;white-space:nowrap}
+    .hd-live{display:flex;align-items:center;gap:5px;font-size:9px;font-family:'Orbitron',sans-serif;color:var(--cyan);letter-spacing:1px;white-space:nowrap}
+    .hd-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:var(--glow);animation:blink 1.3s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
+    /* ── TAGLINE ── */
+    .tagline{position:relative;z-index:29;background:linear-gradient(135deg,#040810,#081525 50%,#040810);border-bottom:1px solid var(--border);text-align:center;padding:5px 10px;flex-shrink:0;overflow:hidden}
+    .tagline::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,212,255,.04),transparent);animation:shim 3.5s linear infinite}
+    @keyframes shim{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+    .tagline h2{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:.8px}
+    .tagline p{font-size:9px;color:var(--muted);margin-top:1px;letter-spacing:.4px}
+
+    /* ── NAV ── */
+    nav{position:absolute;top:104px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;flex-wrap:wrap;justify-content:center;gap:6px;padding:6px 10px;border-radius:12px;background:rgba(6,9,15,.9);border:1px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,.5);backdrop-filter:blur(18px);animation:navIn .7s ease forwards;max-width:96vw}
+    @keyframes navIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    nav a{text-decoration:none;background:rgba(255,255,255,.04);color:var(--txt);padding:5px 11px;border-radius:7px;font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;border:1px solid rgba(255,255,255,.07);transition:var(--ease);font-family:'Orbitron',sans-serif;white-space:nowrap}
+    nav a:hover{background:var(--cyan2);border-color:var(--cyan);color:var(--cyan)}
+    #selWrap{position:relative}
+    nav select{padding:5px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:7px;font-size:10px;font-family:'Orbitron',sans-serif;color:var(--cyan);cursor:pointer;outline:none;transition:var(--ease);max-width:160px}
+    nav select:focus{border-color:var(--cyan)}
+    #clearBtn{background:rgba(220,38,38,.12);color:#f87171;border:1px solid rgba(220,38,38,.28);padding:5px 11px;border-radius:7px;font-size:10px;font-family:'Orbitron',sans-serif;font-weight:600;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;transition:var(--ease);white-space:nowrap}
+    #clearBtn:hover{background:rgba(220,38,38,.3)}
+
+    /* ── MAP ── */
+    #map{flex:1;width:100%;position:relative}
+
+    /* ── 2D/3D TOGGLE ── */
+    .vtoggle{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(6,9,15,.92);border:1px solid var(--border);border-radius:24px;display:flex;overflow:hidden;backdrop-filter:blur(12px);animation:upIn 1s ease .4s backwards}
+    @keyframes upIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .vtoggle button{border:none;background:transparent;color:var(--muted);padding:8px 20px;font-family:'Orbitron',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;cursor:pointer;transition:var(--ease)}
+    .vtoggle button.on{background:linear-gradient(135deg,var(--cyan),#1a7aff);color:#06090f}
+    .vtoggle button:hover:not(.on){color:var(--cyan)}
+
+    
+    /* ── CUSTOM MARKER ── */
+    .pin{display:flex;flex-direction:column;align-items:center;cursor:pointer;position:absolute;will-change:transform;}
+    .pin-bubble{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(8,14,24,.88);border:1px solid rgba(0,212,255,.6);box-shadow:0 0 10px rgba(0,212,255,.3);transition:all .22s ease;font-size:13px;position:relative;z-index:2}
+    .pin-bubble:hover,.pin-bubble.active{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,212,255,.6),0 2px 12px rgba(0,0,0,.55);transform:scale(1.15)}
+    .pin-name{margin-top:4px;font-size:8px;font-weight:600;letter-spacing:.5px;color:rgba(255,255,255,.9);background:rgba(6,9,15,.78);padding:2px 5px;border-radius:4px;white-space:nowrap;border:1px solid rgba(255,255,255,.1);text-align:center;max-width:80px;line-height:1.2;position:relative;z-index:2}
+
+    /* ── POPUP ── */
+    .mapboxgl-popup{max-width:260px!important}
+    .mapboxgl-popup-content{background:var(--panel)!important;border:1px solid var(--border)!important;border-radius:13px!important;padding:0!important;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.75)!important;font-family:'Inter',sans-serif}
+    .mapboxgl-popup-tip{border-top-color:var(--panel)!important}
+    .mapboxgl-popup-close-button{color:var(--muted)!important;font-size:17px!important;padding:5px 9px!important;background:none!important;top:3px!important;right:3px!important;z-index:2}
+    .mapboxgl-popup-close-button:hover{color:var(--cyan)!important}
+
+    .pp-img{width:100%;height:110px;object-fit:cover;display:block;background:rgba(0,212,255,.06)}
+    .pp-body{padding:11px 13px 4px}
+    .pp-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .pp-icon{font-size:20px;width:36px;height:36px;border-radius:8px;background:rgba(0,212,255,.1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .pp-title h3{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--cyan);letter-spacing:.4px}
+    .pp-cat{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;margin-top:1px}
+    .pp-desc{font-size:11px;color:var(--txt);line-height:1.55;opacity:.82;margin-bottom:10px}
+    .pp-stats{display:flex;gap:6px;margin-bottom:10px}
+    .pp-stat{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:6px 7px;text-align:center}
+    .pp-val{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--cyan)}
+    .pp-lbl{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+    .pp-btn{display:block;width:calc(100% - 26px);margin:0 13px 12px;padding:9px;border:none;background:linear-gradient(135deg,var(--cyan),#1a7aff);color:#06090f;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;cursor:pointer;transition:var(--ease)}
+    .pp-btn:hover{transform:translateY(-1px);box-shadow:0 0 22px rgba(0,212,255,.5)}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:480px){
+      .hd-logo{height:28px}
+      .hd-txt h1{font-size:9px;letter-spacing:1.2px}
+      .hd-txt p{font-size:8px}
+      .tagline h2{font-size:10px}
+      nav{top:92px;gap:4px;padding:5px 7px}
+      nav a{font-size:9px;padding:4px 8px}
+      nav select{font-size:9px;padding:4px 8px;max-width:130px}
+      #clearBtn{font-size:9px;padding:4px 8px}
+      .pin-bubble{width:30px;height:30px;font-size:13px}
+      .pin-name{font-size:8px;max-width:70px}
+      .mapboxgl-popup{max-width:230px!important}
+    }
+    @media(min-width:900px){
+      header{padding:9px 22px}
+      .hd-logo{height:42px}
+      .hd-txt h1{font-size:13px}
+      .hd-txt p{font-size:10px}
+      nav{top:130px;padding:8px 14px;gap:8px}
+      nav a{font-size:11px;padding:6px 14px}
+      nav select{font-size:11px;padding:6px 13px;max-width:180px}
+      #clearBtn{font-size:11px;padding:6px 14px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <img src="itex new.png" alt="ITEX 2.0" class="ld-logo">
+  <div class="ld-school">Eheliyagoda National College</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-label">Loading Map</div>
+  <div class="ld-dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <header>
+    <div class="hd-brand">
+      <img src="itex new.png" alt="ITEX 2.0" class="hd-logo">
+      <div class="hd-txt">
+        <h1>Eheliyagoda National College</h1>
+        <p>ITEX 2.0 &nbsp;|&nbsp; ECC ICT Society &nbsp;|&nbsp; 3D School Map</p>
+      </div>
+    </div>
+    <div class="hd-live"><div class="hd-dot"></div>GPS LIVE</div>
+  </header>
+
+  <div class="tagline">
+    <h2>Explore &middot; Navigate &middot; Discover</h2>
+    <p>Tap any pin to explore a location &nbsp;&mdash;&nbsp; ITEX 2.0 by ECC ICT Society</p>
+  </div>
+
+  <nav>
+    <a href="index.html">&#127968; Home</a>
+    <select id="bldSel" onchange="flyTo(this.value)">
+            <option value="">&#128205; Go to location&hellip;</option>
+      <option value="6.8528941206285054,80.26340267461937">🏛 Main Hall</option>
+      <option value="6.852883135575822,80.26365027602695">📚 School Library</option>
+      <option value="6.852913114469875,80.26376152792884">🎒 Grade 8-9 Section</option>
+      <option value="6.85330380333025,80.26404454365336">🏢 Office</option>
+      <option value="6.853148306460939,80.26431925575524">🧪 O/L Laboratory</option>
+      <option value="6.853270368074078,80.26323916745855">🍽 Canteen</option>
+      <option value="6.853503727797835,80.26325431391383">💻 IT Section</option>
+      <option value="6.85352388055513,80.26348704649008">💼 Commerce Section</option>
+      <option value="6.853820446481927,80.26335629711168">🔬 Science Section</option>
+      <option value="6.852971026397565,80.26267597297675">⚽ Ground</option>
+      <option value="6.85307986631588,80.26305109807595">🏟️ Pavilion</option>
+    </select>
+    <a href="about.html">&#8505; About</a>
+    <button id="clearBtn" onclick="clearRoute()">&#10005; Clear</button>
+  </nav>
+
+  <div class="vtoggle">
+    <button id="b2d" onclick="set2D()">2D</button>
+    <button id="b3d" onclick="set3D()" class="on">3D</button>
+  </div>
+
+  <div id="map"></div>
+
+</div>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+<script>
+
+/* ── LOADER ── */
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    document.getElementById('loader').classList.add('out');
+    document.getElementById('app').classList.add('on');
+  },2500);
+});
+
+/* ── CONSTANTS ── */
+const gm=(lat,lng)=>[lng,lat];
+const CENTER=gm(6.8533,80.2634);
+const ZOOM=17, PITCH=60, BRG=-12;
+
+
+
+/* ── LOCATIONS ── */
+const LOCS=[
+  {id:'main-hall', icon:'🏛',name:'Main Hall', cat:'Assembly Hall',
+   desc:'Used for school assemblies, prize-givings and cultural performances. The central gathering space of Eheliyagoda National College.',
+   students:'850+',floors:'2',color:'#b0bec5',height:8,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=Main+Hall',
+   lat:6.8528941206285054,lng:80.26340267461937,
+   poly:[[[80.26334534240449,6.8530821982980346],[80.26347542953535,6.853076206445358],[80.26344927799873,6.852702714147032],[80.26334064853893,6.852715363623598],[80.26334534240449,6.8530821982980346]]]
+  },
+  {id:'library', icon:'📚',name:'School Library', cat:'Learning Hub',
+   desc:'Over 15,000 books, digital resources and quiet study spaces. Open to all students and teachers throughout the day.',
+   students:'15k books',floors:'1',color:'#80cbc4',height:5,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=School+Library',
+   lat:6.852883135575822,lng:80.26365027602695,
+   poly:[[[80.26359411727844,6.853018285199009],[80.26368732403715,6.853030934667215],[80.26371012281267,6.852744657146989],[80.26360953997953,6.852738665290076],[80.26359411727844,6.853018285199009]]]
+  },
+  {id:'grade89', icon:'🎒',name:'Grade 8-9 Section', cat:'Junior Classrooms',
+   desc:'Bright junior classrooms for Grade 8 and 9 students, designed for collaborative learning.',
+   students:'240',floors:'2',color:'#ffcc80',height:6,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=Grade+8-9+Section',
+   lat:6.852913114469875,lng:80.26376152792884,
+   poly:[[[80.26369186961685,6.853030824992008],[80.26379612642816,6.853033573096885],[80.26383303149412,6.852792655842172],[80.26372508417622,6.852795403948436],[80.26369186961685,6.853030824992008]]]
+  },
+  {id:'office', icon:'🏢',name:'Office', cat:'Administration',
+   desc:'The administrative centre — home to the Principal, Vice-Principal and staff.',
+   students:'Staff',floors:'2',color:'#b0bec5',height:7,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=School+Office',
+   lat:6.85330380333025,lng:80.26404454365336,
+   poly:[[[80.2639234489057,6.853337696605781],[80.26393452042548,6.853243345056003],[80.26417071284757,6.853269910057359],[80.26414949243467,6.853364261601857],[80.2639234489057,6.853337696605781]]]
+  },
+  {id:'ol-lab', icon:'🧪',name:'O/L Laboratory', cat:'Science',
+   desc:'Dedicated O/L laboratory for practical experiments and science preparations.',
+   students:'180',floors:'2',color:'#ffe082',height:7,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=O/L+Laboratory',
+   lat:6.853148306460939,lng:80.26431925575524,
+   poly:[[[80.26420854055739,6.853186550912167],[80.26421407631727,6.853091283297643],[80.2644318162064,6.853109603994227],[80.2644225899399,6.85320578763972],[80.26420854055739,6.853186550912167]]]
+  },
+  {id:'canteen', icon:'🍽',name:'Canteen', cat:'Dining',
+   desc:'Fresh meals, snacks and beverages served every school day.',
+   students:'850+',floors:'1',color:'#ef9a9a',height:4,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=Canteen',
+   lat:6.853270368074078,lng:80.26323916745855,
+   poly:[[[80.2633043664084,6.85336517764107],[80.26334496198095,6.853312047647532],[80.26316689503773,6.853156321770284],[80.26313921623827,6.853195711261686],[80.26324808618283,6.853284566614064],[80.26323147890315,6.8533083835098285],[80.2633043664084,6.85336517764107]]]
+  },
+  {id:'it-section', icon:'💻',name:'IT Section', cat:'Technology',
+   desc:'High-speed internet, computer labs and coding classrooms. Hosts ECC ICT Society.',
+   students:'140',floors:'2',color:'#80deea',height:7,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=IT+Section',
+   lat:6.853503727797835,lng:80.26325431391383,
+   poly:[[[80.26332005106256,6.853395406775243],[80.26327853286337,6.8536335756239435],[80.26318903807842,6.853624415285811],[80.263229633651,6.853361513506344],[80.26332005106256,6.853395406775243]]]
+  },
+  {id:'commerce', icon:'💼',name:'Commerce Section', cat:'Department',
+   desc:'Specialised block for Commerce stream students with accounting rooms.',
+   students:'160',floors:'2',color:'#90caf9',height:7,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=Commerce+Section',
+   lat:6.85352388055513,lng:80.26348704649008,
+   poly:[[[80.26345014142413,6.8534201397012895],[80.2635497851022,6.85343571228269],[80.26352302892938,6.853622583219765],[80.26342523050461,6.8536170870167785],[80.26345014142413,6.8534201397012895]]]
+  },
+  {id:'science', icon:'🔬',name:'Science Section', cat:'Department',
+   desc:'Modern science block with Biology, Chemistry and Physics laboratories.',
+   students:'200',floors:'3',color:'#f48fb1',height:12,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=Science+Section',
+   lat:6.853820446481927,lng:80.26335629711168,
+   poly:[[[80.2632130263735,6.8538140342544835],[80.26321394900016,6.853923958256748],[80.26351288003437,6.853932202555909],[80.26351195740772,6.853726095034421],[80.26342246262278,6.853707774361539],[80.2634095458497,6.853823194588978],[80.26321025849356,6.8538158663214075],[80.2632130263735,6.8538140342544835]]]
+  },
+  {id:'ground', icon:'⚽',name:'Ground', cat:'Sports Ground',
+   desc:'Main sports ground for cricket, football and athletics.',
+   students:'All',floors:'Outdoor',color:'#a5d6a7',height:0.3,
+   img:'https://placehold.co/260x110/0c111a/22c55e?text=School+Ground',
+   lat:6.852971026397565,lng:80.26267597297675,
+   poly:[[[80.26279991533946,6.852353382846266],[80.26317756795203,6.852696814970351],[80.26309902957685,6.852945678673804],[80.26277652092983,6.853172974076134],[80.26271302181797,6.8531248604598645],[80.26248409080948,6.853350496687233],[80.26232200097132,6.853240996766697],[80.26244852114905,6.853007563852666],[80.26226308824484,6.852846469245069],[80.26279991533946,6.852353382846266]]]
+  },
+  {id:'pavilion', icon:'🏟️',name:'Pavilion', cat:'Sports',
+   desc:'Spectator pavilion for viewing ground sports and inter-house competitions.',
+   students:'500+',floors:'2',color:'#ffb74d',height:6,
+   img:'https://placehold.co/260x110/0c111a/00d4ff?text=Pavilion',
+   lat:6.85307986631588,lng:80.26305109807595,
+   poly:[[[80.26321582700653,6.853027708507654],[80.26296817075554,6.853218457077789],[80.26292314234628,6.8531320241414],[80.26309725219546,6.852941275536676],[80.26321582700653,6.853027708507654]]]
+  }
+];
+
+/* ── MAP ── */
+mapboxgl.accessToken='pk.YOUR_MAPBOX_TOKEN_HERE';
+const map=new mapboxgl.Map({
+  container:'map',
+  style:'mapbox://styles/mapbox/dark-v11',
+  center:CENTER,zoom:ZOOM,pitch:PITCH,bearing:BRG,antialias:true
+});
+map.addControl(new mapboxgl.NavigationControl({visualizePitch:true}),'top-right');
+map.addControl(new mapboxgl.GeolocateControl({positionOptions:{enableHighAccuracy:true},trackUserLocation:true,showUserHeading:true}),'top-right');
+
+/* ── STATE ── */
+let uMark=null,dMark=null,popup=null;
+
+/* ── ADD BUILDING ── */
+function addBld({id,color,height,poly,polyCircle,clng,clat,ckm,opacity=0.82}){
+  const coords=poly;
+  map.addSource(id,{type:'geojson',data:{type:'Feature',properties:{height},geometry:{type:'Polygon',coordinates:coords}}});
+  map.addLayer({id:id+'-3d',type:'fill-extrusion',source:id,paint:{
+    'fill-extrusion-color':color,
+    'fill-extrusion-height':['get','height'],
+    'fill-extrusion-base':0,
+    'fill-extrusion-opacity':opacity
+  }});
+}
+
+
+
+/* ── ADD CUSTOM PIN MARKER ── */
+const activePins = [];
+function addPin(loc){
+  const el = document.createElement('div');
+  el.className = 'pin';
+  el.innerHTML = `<div class="pin-bubble" id="pb-${loc.id}">${loc.icon}</div><div class="pin-name">${loc.name}</div>`;
+  el.addEventListener('click', (e) => { e.stopPropagation(); openPopup(loc); });
+  
+  const marker = new mapboxgl.Marker({element: el, anchor: 'center'})
+    .setLngLat([loc.lng, loc.lat])
+    .addTo(map);
+    
+  activePins.push({ loc, marker, el });
+}
+
+/* ── UPDATE PIN HEIGHTS ON RENDER ── */
+// This simulates putting the HTML marker on the 3D roof!
+map.on('render', () => {
+  const pitch = map.getPitch();
+  const zoom = map.getZoom();
+  const lat = map.getCenter().lat;
+  
+  // Calculate approx pixels per meter at current zoom
+  const mPerPx = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (256 * Math.pow(2, zoom));
+  
+  // Perspective pitch factor
+  const pitchFactor = Math.sin(pitch * Math.PI / 180);
+  
+  activePins.forEach(p => {
+    // How many pixels tall is this building on screen?
+    const pxHeight = (p.loc.height / mPerPx) * pitchFactor;
+    
+    // We offset the marker visually upwards by that many pixels
+    // Mapbox handles the base X/Y projection. We just shift the Y locally.
+    p.marker.setOffset([0, -pxHeight]);
+  });
+});
+
+/* ── OPEN POPUP ── */
+function openPopup(loc){
+  popup?.remove();
+  document.querySelectorAll('.pin-bubble').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pb-'+loc.id)?.classList.add('active');
+  popup=new mapboxgl.Popup({offset:44,closeButton:true,maxWidth:'260px'})
+    .setLngLat([loc.lng,loc.lat])
+    .setHTML(`
+      <img class="pp-img" src="${loc.img}" alt="${loc.name}" onerror="this.style.display='none'">
+      <div class="pp-body">
+        <div class="pp-head">
+          <div class="pp-icon">${loc.icon}</div>
+          <div class="pp-title">
+            <h3>${loc.name}</h3>
+            <div class="pp-cat">${loc.cat}</div>
+          </div>
+        </div>
+        <p class="pp-desc">${loc.desc}</p>
+        <div class="pp-stats">
+          <div class="pp-stat"><div class="pp-val">${loc.students}</div><div class="pp-lbl">Students</div></div>
+          <div class="pp-stat"><div class="pp-val">${loc.floors}</div><div class="pp-lbl">Floors</div></div>
+        </div>
+      </div>
+      <button class="pp-btn" onclick="getDir(${loc.lng},${loc.lat})">&#129517; Get Directions</button>
+    `)
+    .addTo(map);
+  popup.on('close',()=>document.querySelectorAll('.pin-bubble').forEach(b=>b.classList.remove('active')));
+}
+
+/* ── DIRECTIONS ── */
+async function getDir(dLng,dLat){
+  if(!navigator.geolocation){alert('Geolocation not supported.');return}
+  navigator.geolocation.getCurrentPosition(async({coords})=>{
+    const{longitude:uLng,latitude:uLat}=coords;
+    clearRoute(false);
+    const eu=document.createElement('div');
+    eu.style.cssText='width:12px;height:12px;border-radius:50%;background:#00d4ff;box-shadow:0 0 12px #00d4ff;border:2px solid #fff';
+    uMark=new mapboxgl.Marker({element:eu}).setLngLat([uLng,uLat]).addTo(map);
+    const ed=document.createElement('div');
+    ed.style.cssText='width:12px;height:12px;border-radius:50%;background:#ef4444;box-shadow:0 0 12px #ef4444;border:2px solid #fff';
+    dMark=new mapboxgl.Marker({element:ed}).setLngLat([dLng,dLat]).addTo(map);
+    try{
+      const r=await(await fetch(`https://api.mapbox.com/directions/v5/mapbox/walking/${uLng},${uLat};${dLng},${dLat}?geometries=geojson&access_token=${mapboxgl.accessToken}`)).json();
+      const g=r.routes[0].geometry;
+      map.addSource('route',{type:'geojson',data:{type:'Feature',geometry:g}});
+      map.addLayer({id:'route-glow',type:'line',source:'route',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#00d4ff','line-width':10,'line-opacity':0.18}});
+      map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':'#00d4ff','line-width':3.5,'line-opacity':1}});
+      map.flyTo({center:[uLng,uLat],zoom:ZOOM,pitch:PITCH});
+    }catch(e){console.error(e)}
+  },()=>alert('Enable GPS to get directions.'));
+}
+
+/* ── CLEAR ── */
+function clearRoute(resetCam=true){
+  ['route-line','route-glow'].forEach(l=>{if(map.getLayer(l))map.removeLayer(l)});
+  if(map.getSource('route'))map.removeSource('route');
+  uMark?.remove();uMark=null;
+  dMark?.remove();dMark=null;
+  popup?.remove();popup=null;
+  document.getElementById('bldSel').value='';
+  document.querySelectorAll('.pin-bubble').forEach(b=>b.classList.remove('active'));
+  if(resetCam)map.easeTo({center:CENTER,zoom:ZOOM,pitch:PITCH,bearing:BRG,duration:1600});
+}
+
+/* ── VIEW ── */
+function set2D(){map.easeTo({pitch:0,bearing:0,duration:700})}
+function set3D(){map.easeTo({pitch:PITCH,bearing:BRG,duration:700})}
+function flyTo(v){
+  if(!v)return;
+  const[lat,lng]=v.split(',').map(Number);
+  map.flyTo({center:[lng,lat],zoom:19.5,pitch:PITCH,bearing:-20,duration:1800});
+}
+map.on('pitchend',()=>{
+  const is3=map.getPitch()>=10;
+  document.getElementById('b2d').classList.toggle('on',!is3);
+  document.getElementById('b3d').classList.toggle('on',is3);
+});
+
+/* ── STYLE LOAD ── */
+map.on('style.load',()=>{
+  /* hide clashing labels */
+  map.getStyle().layers.forEach(({type,id})=>{
+    if(type==='symbol'&&(id.includes('poi')||id.includes('place')))
+      map.setLayoutProperty(id,'visibility','none');
+  });
+
+/* Make 3D buildings clickable for popups */
+  map.on('click', (e) => {
+    const layerIds = LOCS.map(l => l.id + '-3d');
+    const features = map.queryRenderedFeatures(e.point, { layers: layerIds });
+    if (features.length) {
+      const id = features[0].layer.id.replace('-3d', '');
+      const loc = LOCS.find(l => l.id === id);
+      if (loc) openPopup(loc);
+    }
+  });
+
+  /* Change cursor to pointer when hovering over buildings */
+  map.on('mousemove', (e) => {
+    const layerIds = LOCS.map(l => l.id + '-3d');
+    const features = map.queryRenderedFeatures(e.point, { layers: layerIds });
+    map.getCanvas().style.cursor = features.length ? 'pointer' : '';
+  });
+
+  /* 3D buildings */
+  LOCS.forEach(l=>{if(l.poly||l.polyCircle)addBld(l)});
+  LOCS.forEach(addPin);
+
+  
+
+  /* mapbox 3d base - transparent */
+  map.addLayer({id:'mb-3d',source:'composite','source-layer':'building',filter:['==','extrude','true'],type:'fill-extrusion',minzoom:15,
+    paint:{'fill-extrusion-color':'#111','fill-extrusion-height':['get','height'],'fill-extrusion-base':['get','min_height'],'fill-extrusion-opacity':0}});
+});
+
+/* dev helper */
+map.on('click',e=>console.log(e.lngLat.lat.toFixed(9),e.lngLat.lng.toFixed(9)));
+
+/* prevent page zoom */
+document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&['+','-','=','0'].includes(e.key))e.preventDefault()});
+
+</script>
+</body>
+</html>
