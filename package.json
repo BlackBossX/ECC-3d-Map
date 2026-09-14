@@ -1,0 +1,7 @@
+{
+  "name": "university-map",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo \"const ENV = { MAPBOX_TOKEN: '${MAPBOX_TOKEN}' };\" > env.js"
+  }
+}
