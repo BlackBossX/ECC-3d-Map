@@ -197,6 +197,7 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+<script src="env.js"></script>
 <script>
 
 /* ── LOADER ── */
@@ -296,7 +297,7 @@ const LOCS=[
 ];
 
 /* ── MAP ── */
-mapboxgl.accessToken='pk.YOUR_MAPBOX_TOKEN_HERE';
+mapboxgl.accessToken=ENV.MAPBOX_TOKEN;
 const map=new mapboxgl.Map({
   container:'map',
   style:'mapbox://styles/mapbox/dark-v11',
